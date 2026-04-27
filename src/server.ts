@@ -1,32 +1,24 @@
-const APP_NAME = "Course Marketplace Backend";
+import app from './app';
+import { config } from './config/env';
+import { prisma } from './shared/prisma/client';
 
-async function startServer() {
+const start = async (): Promise<void> => {
   try {
-    // Validate environment variables before loading the app (fail fast)
-    const { env } = await import("./config/env.js");
-    console.log(`[startup] Booting ${APP_NAME} in ${env.node_env} mode`);
-
-    const [{ setupAuth }, { checkDatabaseConnection }, { default: app }] =
-      await Promise.all([
-        import("./modules/auth/auth.js"),
-        import("./database/checkConnection.js"),
-        import("./app.js"),
-      ]);
-
-    await setupAuth();
-    console.log("[startup] Better Auth initialized");
-    await checkDatabaseConnection();
-    console.log("[startup] Database connection verified");
-
-    app.listen(env.port, () => {
-      console.log(
-        `[startup] ${APP_NAME} listening on http://localhost:${env.port}`,
-      );
+    await prisma.$connect();
+    console.log('Database connected');
+    app.listen(config.port, () => {
+      console.log(`Server running on port ${config.port}`);
     });
-  } catch (err) {
-    console.error(`[startup] Failed to start ${APP_NAME}:`, err);
+  } catch (error) {
+    console.error('Failed to start server', error);
+    await prisma.$disconnect();
     process.exit(1);
   }
-}
+};
 
-startServer();
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+start();

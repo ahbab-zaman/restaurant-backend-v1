@@ -1,17 +1,8 @@
-import createCors from "cors";
-import { env } from "./env.js";
+import { CorsOptions } from 'cors';
+import { config } from './env';
 
-const origin = env.isProduction
-  ? env.corsOrigin
-    ? env.corsOrigin.split(",").map((s) => s.trim())
-    : false
-  : true;
-
-const cors = createCors({
-  origin,
+export const corsOptions: CorsOptions = {
+  origin: config.clientUrl,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-});
-
-export { cors };
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};

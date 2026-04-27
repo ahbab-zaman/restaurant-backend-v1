@@ -1,102 +1,31 @@
-import dotenv from "dotenv";
-import path from "path";
-import { z } from "zod";
+import dotenv from 'dotenv';
 
-dotenv.config({
-  path: path.join(
-    process.cwd(),
-    `.env.${process.env.NODE_ENV || "development"}`,
-  ),
-});
+dotenv.config();
 
-const envSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(8000),
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
+const required = [
+  'PORT',
+  'NODE_ENV',
+  'DATABASE_URL',
+  'BETTER_AUTH_SECRET',
+  'BETTER_AUTH_URL',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'CLIENT_URL',
+] as const;
 
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-
-  // Auth Secrets (required; never default in code)
-  JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
-  REFRESH_TOKEN_SECRET: z.string().min(1, "REFRESH_TOKEN_SECRET is required"),
-
-  // Better Auth (required because server initializes Better Auth)
-  BETTER_AUTH_SECRET: z.string().min(1, "BETTER_AUTH_SECRET is required"),
-  BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a valid URL"),
-  APP_URL: z.string().url("APP_URL must be a valid URL"),
-
-  // Google OAuth (required when Google login is enabled)
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_REDIRECT_URI: z.string().url().optional(),
-
-  // Email (required in production)
-  EMAIL_HOST: z.string().optional(),
-  EMAIL_PORT: z.coerce.number().int().positive().default(587),
-  EMAIL_USER: z.string().optional(),
-  EMAIL_PASS: z.string().optional(),
-  EMAIL_FROM: z.string().default("noreply@storefront.com"),
-
-  // CORS (required in production; comma-separated origins)
-  CORS_ORIGIN: z.string().optional(),
-});
-
-const parsed = envSchema.safeParse(process.env);
-
-if (!parsed.success) {
-  const details = parsed.error.issues
-    .map((i) => `${i.path.join(".")}: ${i.message}`)
-    .join("; ");
-  throw new Error(`Invalid environment variables. ${details}`);
-}
-
-const isProduction = parsed.data.NODE_ENV === "production";
-
-if (isProduction) {
-  const missing: string[] = [];
-  if (!parsed.data.EMAIL_HOST) missing.push("EMAIL_HOST");
-  if (!parsed.data.EMAIL_USER) missing.push("EMAIL_USER");
-  if (!parsed.data.EMAIL_PASS) missing.push("EMAIL_PASS");
-  if (!parsed.data.CORS_ORIGIN) missing.push("CORS_ORIGIN");
-  if (missing.length) {
-    throw new Error(
-      `Missing required environment variables for production: ${missing.join(", ")}`,
-    );
+for (const key of required) {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`);
   }
 }
 
-const env = {
-  port: parsed.data.PORT,
-  node_env: parsed.data.NODE_ENV,
-  isProduction,
-
-  databaseUrl: parsed.data.DATABASE_URL,
-
-  // Auth Secrets
-  jwtSecret: parsed.data.JWT_SECRET,
-  refreshTokenSecret: parsed.data.REFRESH_TOKEN_SECRET,
-
-  // Better Auth
-  betterAuthSecret: parsed.data.BETTER_AUTH_SECRET,
-  betterAuthUrl: parsed.data.BETTER_AUTH_URL,
-  appUrl: parsed.data.APP_URL,
-
-  // Google OAuth
-  googleClientId: parsed.data.GOOGLE_CLIENT_ID ?? "",
-  googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET ?? "",
-  googleRedirectUri: parsed.data.GOOGLE_REDIRECT_URI ?? "",
-
-  corsOrigin: parsed.data.CORS_ORIGIN,
-
-  // Email (Nodemailer)
-  email: {
-    host: parsed.data.EMAIL_HOST,
-    port: parsed.data.EMAIL_PORT,
-    user: parsed.data.EMAIL_USER,
-    pass: parsed.data.EMAIL_PASS,
-    from: parsed.data.EMAIL_FROM,
-  },
+export const config = {
+  port: Number(process.env.PORT),
+  nodeEnv: process.env.NODE_ENV as 'development' | 'production' | 'test',
+  databaseUrl: process.env.DATABASE_URL as string,
+  betterAuthSecret: process.env.BETTER_AUTH_SECRET as string,
+  betterAuthUrl: process.env.BETTER_AUTH_URL as string,
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY as string,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET as string,
+  clientUrl: process.env.CLIENT_URL as string,
 };
-
-export { env };
