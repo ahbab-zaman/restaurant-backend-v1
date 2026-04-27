@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { prisma } from '../../shared/prisma/client';
@@ -6,37 +5,34 @@ import { auth } from './better-auth.instance';
 import { AppError } from '../../shared/utils/app-error';
 import { LoginInput, RegisterInput } from './auth.schema';
 
-const SALT_ROUNDS = 12;
-const BCRYPT_MAX_LENGTH = 72;
-const DUMMY_BCRYPT_HASH = '$2a$12$C6UzMDM.H6dfI/f/IKcEeO6E8f8S6P6j8M4N5g5w8Q7Z8l0x5QH6i';
-
 export const registerUser = async (
   data: RegisterInput,
+  res: Response,
 ): Promise<{ id: string; name: string; email: string; role: string; createdAt: Date }> => {
-  if (Buffer.byteLength(data.password, 'utf8') > BCRYPT_MAX_LENGTH) {
-    throw new AppError('Password exceeds maximum allowed length', 400);
-  }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email: data.email },
-    select: { id: true },
-  });
-
-  if (existingUser) {
-    throw new AppError(
-      'An account with this email already exists. Please log in or use a different email.',
-      409,
-    );
-  }
-
-  const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
-
-  const newUser = await prisma.user.create({
-    data: {
+  const authResponse = await auth.api.signUpEmail({
+    body: {
       name: data.name,
       email: data.email,
-      passwordHash: hashedPassword,
+      password: data.password,
     },
+    asResponse: true,
+  });
+
+  if (!authResponse.ok) {
+    if (authResponse.status === 409) {
+      throw new AppError(
+        'An account with this email already exists. Please log in or use a different email.',
+        409,
+      );
+    }
+
+    throw new AppError('Authentication failed. Please try again.', 500);
+  }
+
+  await authResponse.json();
+
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
     select: {
       id: true,
       name: true,
@@ -46,42 +42,43 @@ export const registerUser = async (
     },
   });
 
-  return newUser;
+  if (!user) {
+    throw new AppError('Authentication failed. Please try again.', 500);
+  }
+
+  res.set('Set-Cookie', authResponse.headers.get('set-cookie') ?? '');
+
+  return user;
 };
 
 export const loginUser = async (
   data: LoginInput,
-  _req: Request,
   res: Response,
 ): Promise<Response> => {
-  const user = await prisma.user.findUnique({
-    where: { email: data.email },
-    select: {
-      id: true,
-      email: true,
-      passwordHash: true,
-      role: true,
-      name: true,
-    },
-  });
-
-  const passwordToCompare = user ? user.passwordHash : DUMMY_BCRYPT_HASH;
-  const isPasswordValid = await bcrypt.compare(data.password, passwordToCompare);
-
-  if (!user || !isPasswordValid) {
-    throw new AppError('Invalid email or password', 401);
-  }
-
   const authResponse = await auth.api.signInEmail({
     body: { email: data.email, password: data.password },
     asResponse: true,
   });
 
   if (!authResponse.ok) {
-    throw new AppError('Authentication failed. Please try again.', 500);
+    throw new AppError('Invalid email or password', 401);
   }
 
   await authResponse.json();
+
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      name: true,
+    },
+  });
+
+  if (!user) {
+    throw new AppError('Authentication failed. Please try again.', 500);
+  }
 
   return res
     .status(200)

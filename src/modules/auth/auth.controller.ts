@@ -4,12 +4,9 @@ import { sendSuccess } from '../../shared/utils/api-response';
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await authService.registerUser(req.body);
-    await authService.loginUser(
-      { email: req.body.email as string, password: req.body.password as string },
-      req,
-      res,
-    );
+    const user = await authService.registerUser(req.body, res);
+
+    sendSuccess(res, user, 201, 'Registration successful');
   } catch (error) {
     next(error);
   }
@@ -17,7 +14,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await authService.loginUser(req.body, req, res);
+    await authService.loginUser(req.body, res);
   } catch (error) {
     next(error);
   }
