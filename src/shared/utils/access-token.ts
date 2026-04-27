@@ -17,6 +17,13 @@ type AccessTokenInput = {
   role: Role;
 };
 
+export class AccessTokenExpiredError extends AppError {
+  constructor() {
+    super('Access token expired. Please refresh and try again.', 401);
+    this.name = 'AccessTokenExpiredError';
+  }
+}
+
 const base64UrlEncode = (value: string): string =>
   Buffer.from(value)
     .toString('base64')
@@ -106,7 +113,7 @@ const parsePayload = (token: string): AccessTokenPayload => {
   }
 
   if (tokenPayload.exp <= Math.floor(Date.now() / 1000)) {
-    throw new AppError('Access token expired. Please refresh and try again.', 401);
+    throw new AccessTokenExpiredError();
   }
 
   return tokenPayload as AccessTokenPayload;

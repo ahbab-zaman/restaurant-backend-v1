@@ -5,4 +5,5 @@ export const corsOptions: CorsOptions = {
   origin: config.clientUrl,
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['X-Access-Token'],
 };

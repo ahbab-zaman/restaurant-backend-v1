@@ -96,7 +96,7 @@ export const registerUser = async (
   const setCookie = authResponse.headers.get('set-cookie');
 
   if (setCookie) {
-    res.set('Set-Cookie', setCookie);
+    res.append('Set-Cookie', setCookie);
   }
 
   if (!user) {
@@ -184,7 +184,7 @@ export const loginUser = async (
 
   const setCookie = authResponse.headers.get('set-cookie');
   if (setCookie) {
-    res.set('Set-Cookie', setCookie);
+    res.append('Set-Cookie', setCookie);
   }
 
   return {
