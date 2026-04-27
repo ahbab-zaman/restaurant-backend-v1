@@ -1,13 +1,48 @@
-import { Request, Response } from 'express';
+import { Request, Response as ExpressResponse } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { prisma } from '../../shared/prisma/client';
 import { auth } from './better-auth.instance';
 import { AppError } from '../../shared/utils/app-error';
 import { LoginInput, RegisterInput } from './auth.schema';
 
+type BetterAuthUserPayload = {
+  id?: string;
+  name?: string;
+  email?: string;
+  createdAt?: string | Date;
+};
+
+type BetterAuthPayload = {
+  message?: string;
+  error?: string;
+  user?: BetterAuthUserPayload;
+};
+
+const parseAuthPayload = async (
+  response: { json: () => Promise<unknown> },
+): Promise<BetterAuthPayload> => {
+  try {
+    return (await response.json()) as BetterAuthPayload;
+  } catch {
+    return {};
+  }
+};
+
+const resolveAuthErrorMessage = (payload: BetterAuthPayload): string | null => {
+  if (typeof payload.message === 'string' && payload.message.trim().length > 0) {
+    return payload.message;
+  }
+
+  if (typeof payload.error === 'string' && payload.error.trim().length > 0) {
+    return payload.error;
+  }
+
+  return null;
+};
+
 export const registerUser = async (
   data: RegisterInput,
-  res: Response,
+  res: ExpressResponse,
 ): Promise<{ id: string; name: string; email: string; role: string; createdAt: Date }> => {
   const authResponse = await auth.api.signUpEmail({
     body: {
@@ -19,20 +54,25 @@ export const registerUser = async (
   });
 
   if (!authResponse.ok) {
+    const payload = await parseAuthPayload(authResponse);
+    const message = resolveAuthErrorMessage(payload);
+
     if (authResponse.status === 409) {
       throw new AppError(
-        'An account with this email already exists. Please log in or use a different email.',
+        message ?? 'An account with this email already exists. Please log in or use a different email.',
         409,
       );
     }
 
-    throw new AppError('Authentication failed. Please try again.', 500);
+    throw new AppError(message ?? `Registration failed (status ${authResponse.status}).`, authResponse.status);
   }
 
-  await authResponse.json();
+  const payload = await parseAuthPayload(authResponse);
+  const resolvedUserId = payload.user?.id;
+  const fallbackCreatedAt = payload.user?.createdAt ? new Date(payload.user.createdAt) : new Date();
 
   const user = await prisma.user.findUnique({
-    where: { email: data.email },
+    where: resolvedUserId ? { id: resolvedUserId } : { email: data.email },
     select: {
       id: true,
       name: true,
@@ -42,32 +82,49 @@ export const registerUser = async (
     },
   });
 
-  if (!user) {
-    throw new AppError('Authentication failed. Please try again.', 500);
+  const setCookie = authResponse.headers.get('set-cookie');
+
+  if (setCookie) {
+    res.set('Set-Cookie', setCookie);
   }
 
-  res.set('Set-Cookie', authResponse.headers.get('set-cookie') ?? '');
+  if (!user) {
+    if (payload.user?.id && payload.user?.email) {
+      return {
+        id: payload.user.id,
+        name: payload.user.name ?? data.name,
+        email: payload.user.email,
+        role: 'GUEST',
+        createdAt: fallbackCreatedAt,
+      };
+    }
+
+    throw new AppError('Registration succeeded but user lookup failed. Please try logging in.', 500);
+  }
 
   return user;
 };
 
 export const loginUser = async (
   data: LoginInput,
-  res: Response,
-): Promise<Response> => {
+  res: ExpressResponse,
+): Promise<ExpressResponse> => {
   const authResponse = await auth.api.signInEmail({
     body: { email: data.email, password: data.password },
     asResponse: true,
   });
 
   if (!authResponse.ok) {
-    throw new AppError('Invalid email or password', 401);
+    const payload = await parseAuthPayload(authResponse);
+    const message = resolveAuthErrorMessage(payload);
+    throw new AppError(message ?? 'Invalid email or password', 401);
   }
 
-  await authResponse.json();
+  const payload = await parseAuthPayload(authResponse);
+  const resolvedUserId = payload.user?.id;
 
   const user = await prisma.user.findUnique({
-    where: { email: data.email },
+    where: resolvedUserId ? { id: resolvedUserId } : { email: data.email },
     select: {
       id: true,
       email: true,
@@ -77,12 +134,27 @@ export const loginUser = async (
   });
 
   if (!user) {
-    throw new AppError('Authentication failed. Please try again.', 500);
+    if (payload.user?.id && payload.user?.email) {
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          id: payload.user.id,
+          name: payload.user.name ?? '',
+          email: payload.user.email,
+          role: 'GUEST',
+        },
+      });
+    }
+
+    throw new AppError('Login succeeded but user lookup failed. Please try again.', 500);
   }
+
+  const setCookie = authResponse.headers.get('set-cookie');
 
   return res
     .status(200)
-    .set('Set-Cookie', authResponse.headers.get('set-cookie') ?? '')
+    .set('Set-Cookie', setCookie ?? '')
     .json({
       success: true,
       message: 'Login successful',

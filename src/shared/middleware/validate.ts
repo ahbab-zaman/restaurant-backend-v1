@@ -4,7 +4,8 @@ import { AppError } from '../utils/app-error';
 
 export const validate = (schema: ZodSchema) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body);
+    const payload = req.body ?? {};
+    const result = schema.safeParse(payload);
 
     if (!result.success) {
       const errors = formatZodErrors(result.error);

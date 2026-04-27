@@ -1,0 +1,3 @@
+ALTER TABLE "sessions"
+ADD COLUMN IF NOT EXISTS "ipAddress" TEXT,
+ADD COLUMN IF NOT EXISTS "userAgent" TEXT;

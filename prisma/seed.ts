@@ -5,16 +5,16 @@ const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   const [adminPassword, managerPassword, guestPassword] = await Promise.all([
-    bcrypt.hash('super123', 12),
+    bcrypt.hash('Super123@', 12),
     bcrypt.hash('Hotel123', 12),
     bcrypt.hash('Guest123', 12),
   ]);
 
   const superAdmin = await prisma.user.upsert({
     where: { email: 'super@admin.com' },
-    update: { name: 'Super Admin', passwordHash: adminPassword, role: Role.SUPER_ADMIN },
+    update: { name: 'MR Super Admin', passwordHash: adminPassword, role: Role.SUPER_ADMIN },
     create: {
-      name: 'Super Admin',
+      name: 'MR Super Admin',
       email: 'super@admin.com',
       passwordHash: adminPassword,
       role: Role.SUPER_ADMIN,
