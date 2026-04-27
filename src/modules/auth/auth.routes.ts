@@ -1,7 +1,15 @@
 import { Router } from 'express';
+import * as authController from './auth.controller';
+import { validate } from '../../shared/middleware/validate';
 import { authenticate } from '../../shared/middleware/authenticate';
-import { me } from './auth.controller';
+import { authLimiter } from '../../shared/middleware/rate-limiter';
+import { loginSchema, registerSchema } from './auth.schema';
 
-export const authRouter = Router();
+const router = Router();
 
-authRouter.get('/me', authenticate, me);
+router.post('/register', authLimiter, validate(registerSchema), authController.register);
+router.post('/login', authLimiter, validate(loginSchema), authController.login);
+router.post('/logout', authenticate, authController.logout);
+router.get('/me', authenticate, authController.getMe);
+
+export default router;

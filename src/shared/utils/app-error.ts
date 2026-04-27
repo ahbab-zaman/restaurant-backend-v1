@@ -4,10 +4,10 @@ export class AppError extends Error {
 
   constructor(message: string, statusCode: number) {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = 'AppError';
     this.statusCode = statusCode;
     this.isOperational = true;
-
-    Object.setPrototypeOf(this, new.target.prototype);
-    Error.captureStackTrace(this);
+    Error.captureStackTrace(this, this.constructor);
   }
 }

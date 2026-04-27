@@ -1,19 +1,22 @@
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { Role } from '@prisma/client';
 import { AppError } from '../utils/app-error';
 
-export function authorize(roles: Role[]) {
+export const authorize = (...roles: Role[]): RequestHandler => {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      next(new AppError('Unauthorized', 401));
-      return;
+      return next(new AppError('Authentication required. Please log in to continue.', 401));
     }
 
     if (!roles.includes(req.user.role)) {
-      next(new AppError('Forbidden', 403));
-      return;
+      return next(
+        new AppError(
+          `Access denied. This action requires one of the following roles: ${roles.join(', ')}`,
+          403,
+        ),
+      );
     }
 
     next();
   };
-}
+};

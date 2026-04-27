@@ -10,6 +10,6 @@ export const roomsRouter = Router();
 
 roomsRouter.get('/', getRooms);
 roomsRouter.get('/:id', getRoom);
-roomsRouter.post('/', authenticate, authorize([Role.HOTEL_ADMIN, Role.SUPER_ADMIN]), validate(createRoomSchema), postRoom);
-roomsRouter.patch('/:id', authenticate, authorize([Role.HOTEL_ADMIN, Role.SUPER_ADMIN]), validate(updateRoomSchema), patchRoom);
-roomsRouter.delete('/:id', authenticate, authorize([Role.HOTEL_ADMIN, Role.SUPER_ADMIN]), deleteRoom);
+roomsRouter.post('/', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN), validate(createRoomSchema), postRoom);
+roomsRouter.patch('/:id', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN), validate(updateRoomSchema), patchRoom);
+roomsRouter.delete('/:id', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN), deleteRoom);

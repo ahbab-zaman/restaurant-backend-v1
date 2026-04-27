@@ -15,11 +15,11 @@ export const bookingsRouter = Router();
 
 bookingsRouter.post('/', authenticate, validate(createBookingSchema), postBooking);
 bookingsRouter.get('/me', authenticate, getMyBookings);
-bookingsRouter.get('/', authenticate, authorize([Role.HOTEL_ADMIN, Role.SUPER_ADMIN]), getBookings);
+bookingsRouter.get('/', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN), getBookings);
 bookingsRouter.patch(
   '/:id/status',
   authenticate,
-  authorize([Role.HOTEL_ADMIN, Role.SUPER_ADMIN]),
+  authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN),
   validate(updateBookingStatusSchema),
   patchBookingStatus,
 );

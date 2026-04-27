@@ -5,39 +5,39 @@ const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   const [adminPassword, managerPassword, guestPassword] = await Promise.all([
-    bcrypt.hash('Admin1234!', 12),
-    bcrypt.hash('Manager1234!', 12),
-    bcrypt.hash('Guest1234!', 12),
+    bcrypt.hash('super123', 12),
+    bcrypt.hash('Hotel123', 12),
+    bcrypt.hash('Guest123', 12),
   ]);
 
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@hotel.com' },
+    where: { email: 'super@admin.com' },
     update: { name: 'Super Admin', passwordHash: adminPassword, role: Role.SUPER_ADMIN },
     create: {
       name: 'Super Admin',
-      email: 'admin@hotel.com',
+      email: 'super@admin.com',
       passwordHash: adminPassword,
       role: Role.SUPER_ADMIN,
     },
   });
 
   const hotelAdmin = await prisma.user.upsert({
-    where: { email: 'manager@hotel.com' },
+    where: { email: 'hotel@admin.com' },
     update: { name: 'Hotel Manager', passwordHash: managerPassword, role: Role.HOTEL_ADMIN },
     create: {
       name: 'Hotel Manager',
-      email: 'manager@hotel.com',
+      email: 'hotel@admin.com',
       passwordHash: managerPassword,
       role: Role.HOTEL_ADMIN,
     },
   });
 
   await prisma.user.upsert({
-    where: { email: 'guest@hotel.com' },
+    where: { email: 'guest@gmail.com' },
     update: { name: 'Guest User', passwordHash: guestPassword, role: Role.GUEST },
     create: {
       name: 'Guest User',
-      email: 'guest@hotel.com',
+      email: 'guest@gmail.com',
       passwordHash: guestPassword,
       role: Role.GUEST,
     },

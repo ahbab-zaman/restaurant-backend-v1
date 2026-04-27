@@ -6,12 +6,11 @@ import morgan from 'morgan';
 import { toNodeHandler } from 'better-auth/node';
 import { corsOptions } from './config/cors';
 import { auth } from './modules/auth/better-auth.instance';
-import { usersRouter } from './modules/users/users.routes';
 import { roomsRouter } from './modules/rooms/rooms.routes';
 import { bookingsRouter } from './modules/bookings/bookings.routes';
 import { paymentsRouter, webhookRouter } from './modules/payments/payments.routes';
 import { reviewsRouter } from './modules/reviews/reviews.routes';
-import { authRouter } from './modules/auth/auth.routes';
+import authRouter from './modules/auth/auth.routes';
 import { errorHandler } from './shared/middleware/error-handler';
 import { generalLimiter } from './shared/middleware/rate-limiter';
 
@@ -37,7 +36,6 @@ app.use(generalLimiter);
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/rooms', roomsRouter);
 app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
