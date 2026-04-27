@@ -4,6 +4,7 @@ import { auth } from '../../modules/auth/better-auth.instance';
 import { AppError } from '../utils/app-error';
 import { Role } from '@prisma/client';
 import { prisma } from '../prisma/client';
+import { verifyAccessToken } from '../utils/access-token';
 
 export const authenticate = async (
   req: Request,
@@ -11,6 +12,24 @@ export const authenticate = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice('Bearer '.length).trim();
+
+      if (!token) {
+        throw new AppError('Access token is missing.', 401);
+      }
+
+      const payload = verifyAccessToken(token);
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        role: payload.role,
+      };
+
+      return next();
+    }
+
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });

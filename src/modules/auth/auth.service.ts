@@ -1,21 +1,34 @@
 import { Request, Response as ExpressResponse } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
+import { Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { auth } from './better-auth.instance';
 import { AppError } from '../../shared/utils/app-error';
 import { LoginInput, RegisterInput } from './auth.schema';
+import { createAccessToken } from '../../shared/utils/access-token';
 
 type BetterAuthUserPayload = {
   id?: string;
   name?: string;
   email?: string;
-  createdAt?: string | Date;
 };
 
 type BetterAuthPayload = {
   message?: string;
   error?: string;
   user?: BetterAuthUserPayload;
+};
+
+type AuthUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+};
+
+type AuthResponse = {
+  user: AuthUser;
+  accessToken: string;
 };
 
 const parseAuthPayload = async (
@@ -43,7 +56,7 @@ const resolveAuthErrorMessage = (payload: BetterAuthPayload): string | null => {
 export const registerUser = async (
   data: RegisterInput,
   res: ExpressResponse,
-): Promise<{ id: string; name: string; email: string; role: string; createdAt: Date }> => {
+): Promise<AuthResponse> => {
   const authResponse = await auth.api.signUpEmail({
     body: {
       name: data.name,
@@ -69,7 +82,6 @@ export const registerUser = async (
 
   const payload = await parseAuthPayload(authResponse);
   const resolvedUserId = payload.user?.id;
-  const fallbackCreatedAt = payload.user?.createdAt ? new Date(payload.user.createdAt) : new Date();
 
   const user = await prisma.user.findUnique({
     where: resolvedUserId ? { id: resolvedUserId } : { email: data.email },
@@ -78,7 +90,6 @@ export const registerUser = async (
       name: true,
       email: true,
       role: true,
-      createdAt: true,
     },
   });
 
@@ -91,24 +102,42 @@ export const registerUser = async (
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
       return {
-        id: payload.user.id,
-        name: payload.user.name ?? data.name,
-        email: payload.user.email,
-        role: 'GUEST',
-        createdAt: fallbackCreatedAt,
+        user: {
+          id: payload.user.id,
+          name: payload.user.name ?? data.name,
+          email: payload.user.email,
+          role: Role.GUEST,
+        },
+        accessToken: createAccessToken({
+          userId: payload.user.id,
+          email: payload.user.email,
+          role: Role.GUEST,
+        }),
       };
     }
 
     throw new AppError('Registration succeeded but user lookup failed. Please try logging in.', 500);
   }
 
-  return user;
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+    accessToken: createAccessToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    }),
+  };
 };
 
 export const loginUser = async (
   data: LoginInput,
   res: ExpressResponse,
-): Promise<ExpressResponse> => {
+): Promise<AuthResponse> => {
   const authResponse = await auth.api.signInEmail({
     body: { email: data.email, password: data.password },
     asResponse: true,
@@ -135,36 +164,42 @@ export const loginUser = async (
 
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        data: {
+      return {
+        user: {
           id: payload.user.id,
           name: payload.user.name ?? '',
           email: payload.user.email,
-          role: 'GUEST',
+          role: Role.GUEST,
         },
-      });
+        accessToken: createAccessToken({
+          userId: payload.user.id,
+          email: payload.user.email,
+          role: Role.GUEST,
+        }),
+      };
     }
 
     throw new AppError('Login succeeded but user lookup failed. Please try again.', 500);
   }
 
   const setCookie = authResponse.headers.get('set-cookie');
+  if (setCookie) {
+    res.set('Set-Cookie', setCookie);
+  }
 
-  return res
-    .status(200)
-    .set('Set-Cookie', setCookie ?? '')
-    .json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+    accessToken: createAccessToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    }),
+  };
 };
 
 export const logoutUser = async (req: Request): Promise<void> => {
@@ -191,4 +226,35 @@ export const getCurrentUser = async (userId: string) => {
   }
 
   return user;
+};
+
+export const refreshAccessToken = async (req: Request): Promise<{ accessToken: string }> => {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+
+  if (!session?.user || !session.session) {
+    throw new AppError('Refresh session not found. Please log in again.', 401);
+  }
+
+  if (session.session.expiresAt < new Date()) {
+    throw new AppError('Refresh session expired. Please log in again.', 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, email: true, role: true },
+  });
+
+  if (!dbUser) {
+    throw new AppError('User not found for refresh. Please log in again.', 401);
+  }
+
+  return {
+    accessToken: createAccessToken({
+      userId: dbUser.id,
+      email: dbUser.email,
+      role: dbUser.role,
+    }),
+  };
 };

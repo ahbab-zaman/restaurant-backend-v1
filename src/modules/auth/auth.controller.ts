@@ -4,9 +4,9 @@ import { sendSuccess } from '../../shared/utils/api-response';
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const user = await authService.registerUser(req.body, res);
+    const authResult = await authService.registerUser(req.body, res);
 
-    sendSuccess(res, user, 201, 'Registration successful');
+    sendSuccess(res, authResult, 201, 'Registration successful');
   } catch (error) {
     next(error);
   }
@@ -14,7 +14,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await authService.loginUser(req.body, res);
+    const authResult = await authService.loginUser(req.body, res);
+    sendSuccess(res, authResult, 200, 'Login successful');
   } catch (error) {
     next(error);
   }
@@ -41,6 +42,15 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
   try {
     const user = await authService.getCurrentUser(req.user.id);
     sendSuccess(res, user, 200, 'User fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const refreshed = await authService.refreshAccessToken(req);
+    sendSuccess(res, refreshed, 200, 'Access token refreshed successfully');
   } catch (error) {
     next(error);
   }
