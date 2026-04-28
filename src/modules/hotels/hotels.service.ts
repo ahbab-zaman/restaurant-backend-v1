@@ -1,6 +1,7 @@
 import { Prisma, Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { AppError } from '../../shared/utils/app-error';
+import { deleteHotelImage, uploadHotelImage } from '../../shared/utils/cloudinary';
 import { buildPaginationMeta, parsePagination } from '../../shared/utils/pagination';
 
 type CreateHotelInput = {
@@ -31,7 +32,7 @@ async function getHotelForWrite(id: string, reqUser: RequestUser) {
   return hotel;
 }
 
-export async function createHotel(userId: string, payload: CreateHotelInput) {
+export async function createHotel(userId: string, payload: CreateHotelInput, imageBuffer: Buffer) {
   const existingHotel = await prisma.hotel.findUnique({
     where: { adminId: userId },
     select: { id: true },
@@ -41,15 +42,24 @@ export async function createHotel(userId: string, payload: CreateHotelInput) {
     throw new AppError('You already have a hotel', 409);
   }
 
+  const uploadedImage = await uploadHotelImage(imageBuffer);
+
+  try {
   return prisma.hotel.create({
     data: {
       adminId: userId,
       name: payload.name,
       address: payload.address,
       description: payload.description,
+      imageUrl: uploadedImage.imageUrl,
+      imagePublicId: uploadedImage.publicId,
     },
     include: { admin: true },
   });
+  } catch (error) {
+    await deleteHotelImage(uploadedImage.publicId);
+    throw error;
+  }
 }
 
 export async function listHotels(query: Record<string, unknown>) {
@@ -85,21 +95,47 @@ export async function updateHotel(
   id: string,
   payload: Partial<CreateHotelInput>,
   reqUser: RequestUser,
+  imageBuffer?: Buffer,
 ) {
-  await getHotelForWrite(id, reqUser);
+  const existingHotel = await getHotelForWrite(id, reqUser);
+  let nextImage: { imageUrl: string; publicId: string } | null = null;
+
+  if (imageBuffer) {
+    nextImage = await uploadHotelImage(imageBuffer);
+  }
 
   const data: Prisma.HotelUpdateInput = {
     ...payload,
+    ...(nextImage && {
+      imageUrl: nextImage.imageUrl,
+      imagePublicId: nextImage.publicId,
+    }),
   };
 
-  return prisma.hotel.update({
-    where: { id },
-    data,
-    include: { admin: true },
-  });
+  try {
+    const updatedHotel = await prisma.hotel.update({
+      where: { id },
+      data,
+      include: { admin: true },
+    });
+
+    if (nextImage && existingHotel.imagePublicId) {
+      await deleteHotelImage(existingHotel.imagePublicId);
+    }
+
+    return updatedHotel;
+  } catch (error) {
+    if (nextImage) {
+      await deleteHotelImage(nextImage.publicId);
+    }
+    throw error;
+  }
 }
 
 export async function removeHotel(id: string, reqUser: RequestUser) {
-  await getHotelForWrite(id, reqUser);
+  const existingHotel = await getHotelForWrite(id, reqUser);
   await prisma.hotel.delete({ where: { id } });
+  if (existingHotel.imagePublicId) {
+    await deleteHotelImage(existingHotel.imagePublicId);
+  }
 }

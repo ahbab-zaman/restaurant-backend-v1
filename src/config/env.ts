@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+dotenv.config({
+  path: path.resolve(__dirname, '../../.env'),
+});
 
 const required = [
   'PORT',
@@ -11,6 +14,9 @@ const required = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'CLIENT_URL',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
 ] as const;
 
 for (const key of required) {
@@ -36,4 +42,7 @@ export const config = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY as string,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET as string,
   clientUrl: process.env.CLIENT_URL as string,
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME as string,
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY as string,
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET as string,
 };

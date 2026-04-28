@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import { MulterError } from 'multer';
 import { AppError } from '../utils/app-error';
 import { ZodError } from 'zod';
 
@@ -25,6 +26,19 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
 
   if (err instanceof ZodError) {
     const message = err.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+    res.status(422).json({
+      success: false,
+      message,
+      data: null,
+    });
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'Image size exceeds the maximum limit of 5MB.'
+        : err.message;
     res.status(422).json({
       success: false,
       message,

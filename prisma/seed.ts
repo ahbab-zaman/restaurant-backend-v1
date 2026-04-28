@@ -49,12 +49,16 @@ async function main(): Promise<void> {
       name: 'Grand Horizon Hotel',
       address: '123 Downtown Avenue, Dhaka',
       description: 'Luxury city-center hotel for business and leisure stays.',
+      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      imagePublicId: 'sample',
     },
     create: {
       adminId: hotelAdmin.id,
       name: 'Grand Horizon Hotel',
       address: '123 Downtown Avenue, Dhaka',
       description: 'Luxury city-center hotel for business and leisure stays.',
+      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      imagePublicId: 'sample',
     },
   });
 

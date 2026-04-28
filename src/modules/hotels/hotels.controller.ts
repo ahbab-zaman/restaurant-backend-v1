@@ -15,7 +15,11 @@ export async function postHotel(req: Request, res: Response, next: NextFunction)
       throw new AppError('Authentication required. Please log in to continue.', 401);
     }
 
-    const data = await createHotel(req.user.id, req.body);
+    if (!req.file) {
+      throw new AppError('Hotel image is required.', 422);
+    }
+
+    const data = await createHotel(req.user.id, req.body, req.file.buffer);
     sendSuccess(res, data, 201, 'Hotel created');
   } catch (error) {
     next(error);
@@ -46,7 +50,7 @@ export async function patchHotel(req: Request, res: Response, next: NextFunction
       throw new AppError('Authentication required. Please log in to continue.', 401);
     }
 
-    const data = await updateHotel(String(req.params.id), req.body, req.user);
+    const data = await updateHotel(String(req.params.id), req.body, req.user, req.file?.buffer);
     sendSuccess(res, data, 200, 'Hotel updated');
   } catch (error) {
     next(error);
