@@ -10,6 +10,7 @@ import { roomsRouter } from './modules/rooms/rooms.routes';
 import { bookingsRouter } from './modules/bookings/bookings.routes';
 import { paymentsRouter, webhookRouter } from './modules/payments/payments.routes';
 import { reviewsRouter } from './modules/reviews/reviews.routes';
+import { hotelsRouter } from './modules/hotels/hotels.routes';
 import authRouter from './modules/auth/auth.routes';
 import { errorHandler } from './shared/middleware/error-handler';
 import { generalLimiter } from './shared/middleware/rate-limiter';
@@ -40,6 +41,7 @@ app.use('/api/v1/rooms', roomsRouter);
 app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
 app.use('/api/v1/reviews', reviewsRouter);
+app.use('/api/v1/hotels', hotelsRouter);
 
 app.use((_req, res) => res.status(404).json({ message: 'Route not found' }));
 
