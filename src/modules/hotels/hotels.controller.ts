@@ -28,7 +28,11 @@ export async function postHotel(req: Request, res: Response, next: NextFunction)
 
 export async function getHotels(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await listHotels(req.query as Record<string, unknown>);
+    if (!req.user) {
+      throw new AppError('Authentication required. Please log in to continue.', 401);
+    }
+
+    const data = await listHotels(req.query as Record<string, unknown>, req.user);
     sendSuccess(res, data, 200, 'Hotels fetched');
   } catch (error) {
     next(error);

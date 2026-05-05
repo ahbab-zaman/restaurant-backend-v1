@@ -43,16 +43,8 @@ async function main(): Promise<void> {
     },
   });
 
-  const hotel = await prisma.hotel.upsert({
-    where: { adminId: hotelAdmin.id },
-    update: {
-      name: 'Grand Horizon Hotel',
-      address: '123 Downtown Avenue, Dhaka',
-      description: 'Luxury city-center hotel for business and leisure stays.',
-      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-      imagePublicId: 'sample',
-    },
-    create: {
+  const hotel = await prisma.hotel.create({
+    data: {
       adminId: hotelAdmin.id,
       name: 'Grand Horizon Hotel',
       address: '123 Downtown Avenue, Dhaka',

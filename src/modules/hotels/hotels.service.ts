@@ -33,15 +33,6 @@ async function getHotelForWrite(id: string, reqUser: RequestUser) {
 }
 
 export async function createHotel(userId: string, payload: CreateHotelInput, imageBuffer: Buffer) {
-  const existingHotel = await prisma.hotel.findUnique({
-    where: { adminId: userId },
-    select: { id: true },
-  });
-
-  if (existingHotel) {
-    throw new AppError('You already have a hotel', 409);
-  }
-
   const uploadedImage = await uploadHotelImage(imageBuffer);
 
   try {
@@ -62,17 +53,19 @@ export async function createHotel(userId: string, payload: CreateHotelInput, ima
   }
 }
 
-export async function listHotels(query: Record<string, unknown>) {
+export async function listHotels(query: Record<string, unknown>, reqUser: RequestUser) {
   const { page, limit, skip } = parsePagination(query);
+  const where = reqUser.role === Role.HOTEL_ADMIN ? { adminId: reqUser.id } : undefined;
 
   const [items, total] = await Promise.all([
     prisma.hotel.findMany({
+      where,
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
       include: { admin: true },
     }),
-    prisma.hotel.count(),
+    prisma.hotel.count({ where }),
   ]);
 
   return { items, meta: buildPaginationMeta(total, page, limit) };

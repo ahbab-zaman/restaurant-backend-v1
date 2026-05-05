@@ -17,7 +17,7 @@ model User {
   emailVerified Boolean   @default(false)
   accounts      Account[]
   bookings      Booking[]
-  hotels        Hotel?
+  hotels        Hotel[]
   reviews       Review[]
   sessions      Session[]
 
@@ -55,7 +55,7 @@ model Account {
 
 model Hotel {
   id          String   @id @default(cuid())
-  adminId     String   @unique
+  adminId     String
   name        String
   address     String
   description String?
