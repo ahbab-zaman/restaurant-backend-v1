@@ -49,5 +49,30 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const updateUserSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Name must be at least 2 characters')
+      .max(50, 'Name must not exceed 50 characters')
+      .regex(
+        /^[a-zA-Z\s'-]+$/,
+        'Name can only contain letters, spaces, hyphens, and apostrophes',
+      )
+      .optional(),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email('Please provide a valid email address')
+      .max(255, 'Email must not exceed 255 characters')
+      .optional(),
+  })
+  .refine((data) => data.name !== undefined || data.email !== undefined, {
+    message: 'At least one field is required',
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;

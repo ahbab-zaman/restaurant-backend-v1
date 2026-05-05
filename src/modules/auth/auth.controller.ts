@@ -55,3 +55,12 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
     next(error);
   }
 };
+
+export const updateMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const user = await authService.updateCurrentUser(req.user.id, req.body);
+    sendSuccess(res, user, 200, 'User updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};

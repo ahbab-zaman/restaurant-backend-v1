@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { auth } from './better-auth.instance';
 import { AppError } from '../../shared/utils/app-error';
-import { LoginInput, RegisterInput } from './auth.schema';
+import { LoginInput, RegisterInput, UpdateUserInput } from './auth.schema';
 import { createAccessToken } from '../../shared/utils/access-token';
 
 type BetterAuthUserPayload = {
@@ -257,4 +257,24 @@ export const refreshAccessToken = async (req: Request): Promise<{ accessToken: s
       role: dbUser.role,
     }),
   };
+};
+
+export const updateCurrentUser = async (userId: string, data: UpdateUserInput) => {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.email !== undefined ? { email: data.email } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return user;
 };
