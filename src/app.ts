@@ -37,11 +37,12 @@ app.use(generalLimiter);
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/rooms', roomsRouter);
 app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
 app.use('/api/v1/reviews', reviewsRouter);
 app.use('/api/v1/hotels', hotelsRouter);
+app.use('/api/hotels/:hotelId/rooms', roomsRouter);
+app.use('/api/v1/hotels/:hotelId/rooms', roomsRouter);
 
 app.use((_req, res) => res.status(404).json({ message: 'Route not found' }));
 

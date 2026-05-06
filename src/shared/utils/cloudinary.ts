@@ -13,16 +13,16 @@ type UploadImageResult = {
   publicId: string;
 };
 
-export async function uploadHotelImage(fileBuffer: Buffer): Promise<UploadImageResult> {
+async function uploadImage(fileBuffer: Buffer, folder: string, errorMessage: string): Promise<UploadImageResult> {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: 'hotels',
+        folder,
         resource_type: 'image',
       },
       (error, result) => {
         if (error || !result) {
-          reject(new AppError('Failed to upload hotel image', 500));
+          reject(new AppError(errorMessage, 500));
           return;
         }
 
@@ -37,7 +37,23 @@ export async function uploadHotelImage(fileBuffer: Buffer): Promise<UploadImageR
   });
 }
 
+export async function uploadHotelImage(fileBuffer: Buffer): Promise<UploadImageResult> {
+  return uploadImage(fileBuffer, 'hotels', 'Failed to upload hotel image');
+}
+
+export async function uploadRoomImage(fileBuffer: Buffer): Promise<UploadImageResult> {
+  return uploadImage(fileBuffer, 'rooms', 'Failed to upload room image');
+}
+
 export async function deleteHotelImage(publicId: string): Promise<void> {
+  if (!publicId) {
+    return;
+  }
+
+  await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+}
+
+export async function deleteRoomImage(publicId: string): Promise<void> {
   if (!publicId) {
     return;
   }
