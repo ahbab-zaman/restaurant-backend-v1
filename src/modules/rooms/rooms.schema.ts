@@ -29,6 +29,20 @@ const toArray = (value: unknown): string[] => {
   return [];
 };
 
+const toBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+
+  return undefined;
+};
+
 export const createRoomSchema = z.object({
   roomNumber: z.string().trim().min(1).max(20),
   type: z.nativeEnum(RoomType),
@@ -37,7 +51,7 @@ export const createRoomSchema = z.object({
   floor: z.preprocess(toNumber, z.number().int()),
   description: z.string().trim().max(1000).optional(),
   amenities: z.preprocess(toArray, z.array(z.string().trim().min(1)).default([])),
-  isAvailable: z.boolean().optional(),
+  isAvailable: z.preprocess(toBoolean, z.boolean().optional()),
   quantity: z.preprocess(toNumber, z.number().int().min(1).max(50)),
 });
 
