@@ -53,9 +53,9 @@ export async function createHotel(userId: string, payload: CreateHotelInput, ima
   }
 }
 
-export async function listHotels(query: Record<string, unknown>, reqUser: RequestUser) {
+export async function listHotels(query: Record<string, unknown>, reqUser?: RequestUser) {
   const { page, limit, skip } = parsePagination(query);
-  const where = reqUser.role === Role.HOTEL_ADMIN ? { adminId: reqUser.id } : undefined;
+  const where = reqUser?.role === Role.HOTEL_ADMIN ? { adminId: reqUser.id } : undefined;
 
   const [items, total] = await Promise.all([
     prisma.hotel.findMany({

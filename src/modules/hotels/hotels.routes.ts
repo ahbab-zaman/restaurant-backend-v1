@@ -15,7 +15,7 @@ import { createHotelSchema, updateHotelSchema } from './hotels.schema';
 
 export const hotelsRouter = Router();
 
-hotelsRouter.get('/', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN), getHotels);
+hotelsRouter.get('/', getHotels);
 hotelsRouter.get('/:id', getHotel);
 hotelsRouter.post(
   '/',
