@@ -96,7 +96,8 @@ export const listUsers = async (req: Request, res: Response, next: NextFunction)
 
 export const getUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const user = await authService.getUserById(req.params.userId);
+    const userId = req.params.userId as string;
+    const user = await authService.getUserById(userId);
     sendSuccess(res, user, 200, 'User fetched successfully');
   } catch (error) {
     next(error);
@@ -109,12 +110,14 @@ export const adminUpdateUser = async (req: Request, res: Response, next: NextFun
       return next(new AppError('Unauthorized', 401));
     }
 
+    const userId = req.params.userId as string;
+
     // Prevent a super-admin from changing their own role
-    if (req.user.id === req.params.userId && req.body.role !== undefined && req.body.role !== req.user.role) {
+    if (req.user.id === userId && req.body.role !== undefined && req.body.role !== req.user.role) {
       return next(new AppError('You cannot change your own role', 403));
     }
 
-    const user = await authService.adminUpdateUser(req.params.userId, req.body);
+    const user = await authService.adminUpdateUser(userId, req.body);
     sendSuccess(res, user, 200, 'User updated successfully');
   } catch (error) {
     next(error);
@@ -127,12 +130,14 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
       return next(new AppError('Unauthorized', 401));
     }
 
+    const userId = req.params.userId as string;
+
     // Prevent a super-admin from deleting their own account
-    if (req.user.id === req.params.userId) {
+    if (req.user.id === userId) {
       return next(new AppError('You cannot delete your own account', 403));
     }
 
-    await authService.deleteUser(req.params.userId);
+    await authService.deleteUser(userId);
     sendSuccess(res, null, 204, 'User deleted successfully');
   } catch (error) {
     next(error);

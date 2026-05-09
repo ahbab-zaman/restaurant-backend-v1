@@ -1,4 +1,4 @@
-import { Request, Response as ExpressResponse } from 'express';
+import { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
@@ -29,6 +29,7 @@ type AuthUser = {
 type AuthResponse = {
   user: AuthUser;
   accessToken: string;
+  setCookie: string | null;
 };
 
 const parseAuthPayload = async (
@@ -55,7 +56,6 @@ const resolveAuthErrorMessage = (payload: BetterAuthPayload): string | null => {
 
 export const registerUser = async (
   data: RegisterInput,
-  res: ExpressResponse,
 ): Promise<AuthResponse> => {
   const authResponse = await auth.api.signUpEmail({
     body: {
@@ -95,10 +95,6 @@ export const registerUser = async (
 
   const setCookie = authResponse.headers.get('set-cookie');
 
-  if (setCookie) {
-    res.append('Set-Cookie', setCookie);
-  }
-
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
       return {
@@ -113,6 +109,7 @@ export const registerUser = async (
           email: payload.user.email,
           role: Role.GUEST,
         }),
+        setCookie,
       };
     }
 
@@ -131,12 +128,12 @@ export const registerUser = async (
       email: user.email,
       role: user.role,
     }),
+    setCookie,
   };
 };
 
 export const loginUser = async (
   data: LoginInput,
-  res: ExpressResponse,
 ): Promise<AuthResponse> => {
   const authResponse = await auth.api.signInEmail({
     body: { email: data.email, password: data.password },
@@ -162,6 +159,8 @@ export const loginUser = async (
     },
   });
 
+  const setCookie = authResponse.headers.get('set-cookie');
+
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
       return {
@@ -176,15 +175,11 @@ export const loginUser = async (
           email: payload.user.email,
           role: Role.GUEST,
         }),
+        setCookie,
       };
     }
 
     throw new AppError('Login succeeded but user lookup failed. Please try again.', 500);
-  }
-
-  const setCookie = authResponse.headers.get('set-cookie');
-  if (setCookie) {
-    res.append('Set-Cookie', setCookie);
   }
 
   return {
@@ -199,6 +194,7 @@ export const loginUser = async (
       email: user.email,
       role: user.role,
     }),
+    setCookie,
   };
 };
 
@@ -284,6 +280,7 @@ export const listAllUsers = async (page = 1, limit = 10) => {
 
   const [items, total] = await Promise.all([
     prisma.user.findMany({
+      where: { role: { not: Role.SUPER_ADMIN } },
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -296,7 +293,7 @@ export const listAllUsers = async (page = 1, limit = 10) => {
         updatedAt: true,
       },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where: { role: { not: Role.SUPER_ADMIN } } }),
   ]);
 
   return {
