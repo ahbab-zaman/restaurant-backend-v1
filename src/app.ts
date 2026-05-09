@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import { toNodeHandler } from 'better-auth/node';
 import { corsOptions } from './config/cors';
 import { auth } from './modules/auth/better-auth.instance';
-import { roomsRouter } from './modules/rooms/rooms.routes';
+import { bulkRoomsRouter, roomsRouter } from './modules/rooms/rooms.routes';
 import { bookingsRouter } from './modules/bookings/bookings.routes';
 import { paymentsRouter, webhookRouter } from './modules/payments/payments.routes';
 import { reviewsRouter } from './modules/reviews/reviews.routes';
@@ -41,6 +41,7 @@ app.use('/api/v1/bookings', bookingsRouter);
 app.use('/api/v1/payments', paymentsRouter);
 app.use('/api/v1/reviews', reviewsRouter);
 app.use('/api/v1/hotels', hotelsRouter);
+app.use('/api/v1/rooms', bulkRoomsRouter);
 app.use('/api/hotels/:hotelId/rooms', roomsRouter);
 app.use('/api/v1/hotels/:hotelId/rooms', roomsRouter);
 

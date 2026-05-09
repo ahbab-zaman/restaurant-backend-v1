@@ -55,7 +55,13 @@ export async function createHotel(userId: string, payload: CreateHotelInput, ima
 
 export async function listHotels(query: Record<string, unknown>, reqUser?: RequestUser) {
   const { page, limit, skip } = parsePagination(query);
-  const where = reqUser?.role === Role.HOTEL_ADMIN ? { adminId: reqUser.id } : undefined;
+
+  // Only filter by owner when the caller explicitly requests their own hotels
+  // (e.g. dashboard context with ?myHotels=true) AND they are a HOTEL_ADMIN.
+  // Public pages, SUPER_ADMIN, and guests always receive the full list.
+  const myHotels = query.myHotels === 'true';
+  const where =
+    myHotels && reqUser?.role === Role.HOTEL_ADMIN ? { adminId: reqUser.id } : undefined;
 
   const [items, total] = await Promise.all([
     prisma.hotel.findMany({

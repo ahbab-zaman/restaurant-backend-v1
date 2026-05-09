@@ -147,6 +147,30 @@ export async function listRoomsByHotel(hotelId: string, query: Record<string, un
   return { items, meta: buildPaginationMeta(total, page, limit) };
 }
 
+export async function listRoomsByHotelIds(hotelIds: string[], query: Record<string, unknown>) {
+  const { page, limit, skip } = parsePagination(query);
+
+  const where: Prisma.RoomWhereInput = {
+    hotelId: { in: hotelIds },
+    ...(query.type && typeof query.type === 'string' ? { type: query.type as RoomType } : {}),
+    ...(query.isAvailable === 'true' ? { isAvailable: true } : {}),
+    ...(query.isAvailable === 'false' ? { isAvailable: false } : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.room.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.room.count({ where }),
+  ]);
+
+  return { items, meta: buildPaginationMeta(total, page, limit) };
+}
+
+
 export async function updateRoom(
   hotelId: string,
   roomId: string,

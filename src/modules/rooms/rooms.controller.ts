@@ -1,7 +1,25 @@
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../shared/utils/app-error';
 import { sendSuccess } from '../../shared/utils/api-response';
-import { createRooms, listRoomsByHotel, removeRoom, updateRoom } from './rooms.service';
+import { createRooms, listRoomsByHotel, listRoomsByHotelIds, removeRoom, updateRoom } from './rooms.service';
+
+export async function getBulkRooms(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const raw = typeof req.query.hotelIds === 'string' ? req.query.hotelIds : '';
+    const hotelIds = raw.split(',').map((id) => id.trim()).filter(Boolean);
+
+    if (!hotelIds.length) {
+      sendSuccess(res, { items: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } }, 200, 'Rooms fetched');
+      return;
+    }
+
+    const data = await listRoomsByHotelIds(hotelIds, req.query as Record<string, unknown>);
+    sendSuccess(res, data, 200, 'Rooms fetched');
+  } catch (error) {
+    next(error);
+  }
+}
+
 
 export async function postRooms(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Role } from '@prisma/client';
 import { authenticate } from '../../shared/middleware/authenticate';
 import { authorize } from '../../shared/middleware/authorize';
+import { optionalAuthenticate } from '../../shared/middleware/optional-authenticate';
 import { hotelImageUpload } from '../../shared/middleware/hotel-image-upload';
 import { validate } from '../../shared/middleware/validate';
 import {
@@ -15,8 +16,8 @@ import { createHotelSchema, updateHotelSchema } from './hotels.schema';
 
 export const hotelsRouter = Router();
 
-hotelsRouter.get('/', getHotels);
-hotelsRouter.get('/:id', getHotel);
+hotelsRouter.get('/', optionalAuthenticate, getHotels);
+hotelsRouter.get('/:id', optionalAuthenticate, getHotel);
 hotelsRouter.post(
   '/',
   authenticate,
