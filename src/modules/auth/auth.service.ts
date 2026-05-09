@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { auth } from './better-auth.instance';
 import { AppError } from '../../shared/utils/app-error';
-import { LoginInput, RegisterInput, UpdateUserInput } from './auth.schema';
+import { LoginInput, RegisterInput, UpdateUserInput, AdminUpdateUserInput } from './auth.schema';
 import { createAccessToken } from '../../shared/utils/access-token';
 
 type BetterAuthUserPayload = {
@@ -277,4 +277,92 @@ export const updateCurrentUser = async (userId: string, data: UpdateUserInput) =
   });
 
   return user;
+};
+
+export const listAllUsers = async (page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
+
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.user.count(),
+  ]);
+
+  return {
+    items,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+export const getUserById = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  return user;
+};
+
+export const adminUpdateUser = async (userId: string, data: AdminUpdateUserInput) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.email !== undefined ? { email: data.email } : {}),
+      ...(data.role !== undefined ? { role: data.role } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return updated;
+};
+
+export const deleteUser = async (userId: string) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
 };
