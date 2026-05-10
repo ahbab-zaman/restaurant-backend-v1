@@ -4,6 +4,7 @@ import { AppError } from '../../shared/utils/app-error';
 import { sendSuccess } from '../../shared/utils/api-response';
 import {
   createBooking,
+  getBookingById,
   listAllBookings,
   listMyBookings,
   updateBookingStatus,
@@ -37,6 +38,19 @@ export async function getBookings(req: Request, res: Response, next: NextFunctio
   try {
     const data = await listAllBookings(req.query as Record<string, unknown>);
     sendSuccess(res, data, 200, 'Bookings fetched');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getBooking(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) {
+      throw new AppError('Unauthorized', 401);
+    }
+
+    const data = await getBookingById(String(req.params.id), req.user.id, req.user.role);
+    sendSuccess(res, data, 200, 'Booking fetched');
   } catch (error) {
     next(error);
   }

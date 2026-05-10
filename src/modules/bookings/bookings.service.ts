@@ -1,4 +1,4 @@
-import { BookingStatus, Prisma } from '@prisma/client';
+import { BookingStatus, Prisma, Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { AppError } from '../../shared/utils/app-error';
 import { buildPaginationMeta, parsePagination } from '../../shared/utils/pagination';
@@ -77,6 +77,23 @@ export async function listMyBookings(userId: string, query: Record<string, unkno
   ]);
 
   return { items, meta: buildPaginationMeta(total, page, limit) };
+}
+
+export async function getBookingById(id: string, userId: string, role: Role) {
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: { room: true, payment: true, user: true },
+  });
+
+  if (!booking) {
+    throw new AppError('Booking not found', 404);
+  }
+
+  if (role === Role.GUEST && booking.userId !== userId) {
+    throw new AppError('Forbidden', 403);
+  }
+
+  return booking;
 }
 
 export async function listAllBookings(query: Record<string, unknown>) {
