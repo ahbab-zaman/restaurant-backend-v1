@@ -82,7 +82,7 @@ export async function listMyBookings(userId: string, query: Record<string, unkno
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: { room: true, payment: true },
+      include: { room: { include: { hotel: true } }, payment: true, user: true },
     }),
     prisma.booking.count({ where }),
   ]);
