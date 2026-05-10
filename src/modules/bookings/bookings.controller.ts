@@ -37,7 +37,10 @@ export async function getMyBookings(req: Request, res: Response, next: NextFunct
 
 export async function getBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await listAllBookings(req.query as Record<string, unknown>);
+    if (!req.user) {
+      throw new AppError('Unauthorized', 401);
+    }
+    const data = await listAllBookings(req.query as Record<string, unknown>, req.user.id, req.user.role);
     sendSuccess(res, data, 200, 'Bookings fetched');
   } catch (error) {
     next(error);

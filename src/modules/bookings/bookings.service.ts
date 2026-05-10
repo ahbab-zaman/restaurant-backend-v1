@@ -107,17 +107,28 @@ export async function getBookingById(id: string, userId: string, role: Role) {
   return booking;
 }
 
-export async function listAllBookings(query: Record<string, unknown>) {
+export async function listAllBookings(query: Record<string, unknown>, userId: string, role: Role) {
   const { page, limit, skip } = parsePagination(query);
+  const where: Prisma.BookingWhereInput =
+    role === Role.HOTEL_ADMIN
+      ? {
+          room: {
+            hotel: {
+              adminId: userId,
+            },
+          },
+        }
+      : {};
 
   const [items, total] = await Promise.all([
     prisma.booking.findMany({
+      where,
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: { room: true, payment: true, user: true },
+      include: { room: { include: { hotel: true } }, payment: true, user: true },
     }),
-    prisma.booking.count(),
+    prisma.booking.count({ where }),
   ]);
 
   return { items, meta: buildPaginationMeta(total, page, limit) };

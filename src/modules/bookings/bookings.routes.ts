@@ -23,7 +23,7 @@ bookingsRouter.get('/', authenticate, authorize(Role.HOTEL_ADMIN, Role.SUPER_ADM
 bookingsRouter.patch(
   '/:id/status',
   authenticate,
-  authorize(Role.HOTEL_ADMIN, Role.SUPER_ADMIN),
+  authorize(Role.SUPER_ADMIN),
   validate(updateBookingStatusSchema),
   patchBookingStatus,
 );
