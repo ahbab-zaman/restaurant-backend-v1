@@ -11,6 +11,17 @@ type CreateBookingInput = {
   notes?: string;
 };
 
+type AvailabilityInput = {
+  roomId: string;
+  startDate: Date;
+  days: number;
+};
+
+type RoomAvailabilityDate = {
+  date: string;
+  isAvailable: boolean;
+};
+
 export async function createBooking(userId: string, payload: CreateBookingInput) {
   if (payload.checkIn >= payload.checkOut) {
     throw new AppError('checkOut must be after checkIn', 422);
@@ -118,4 +129,66 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
     data: { status },
     include: { room: true, payment: true },
   });
+}
+
+export async function getRoomAvailabilityWindow(payload: AvailabilityInput) {
+  const room = await prisma.room.findUnique({
+    where: { id: payload.roomId },
+    select: { id: true, isAvailable: true },
+  });
+
+  if (!room) {
+    throw new AppError('Room not found', 404);
+  }
+
+  if (!room.isAvailable) {
+    return {
+      roomId: payload.roomId,
+      startDate: payload.startDate.toISOString(),
+      days: payload.days,
+      items: [] as RoomAvailabilityDate[],
+    };
+  }
+
+  const start = new Date(payload.startDate);
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + payload.days + 1);
+
+  const overlapping = await prisma.booking.findMany({
+    where: {
+      roomId: payload.roomId,
+      status: { in: [BookingStatus.PENDING, BookingStatus.AWAITING_PAYMENT, BookingStatus.CONFIRMED] },
+      checkIn: { lt: end },
+      checkOut: { gt: start },
+    },
+    select: { checkIn: true, checkOut: true },
+    orderBy: { checkIn: 'asc' },
+  });
+
+  const items: RoomAvailabilityDate[] = [];
+
+  for (let i = 0; i < payload.days; i += 1) {
+    const dayStart = new Date(start);
+    dayStart.setUTCDate(start.getUTCDate() + i);
+
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayStart.getUTCDate() + 1);
+
+    const isBlocked = overlapping.some(
+      (booking) => booking.checkIn < dayEnd && booking.checkOut > dayStart,
+    );
+
+    items.push({
+      date: dayStart.toISOString(),
+      isAvailable: !isBlocked,
+    });
+  }
+
+  return {
+    roomId: payload.roomId,
+    startDate: start.toISOString(),
+    days: payload.days,
+    items: items.filter((item) => item.isAvailable),
+  };
 }

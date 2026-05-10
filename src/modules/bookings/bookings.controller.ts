@@ -4,6 +4,7 @@ import { AppError } from '../../shared/utils/app-error';
 import { sendSuccess } from '../../shared/utils/api-response';
 import {
   createBooking,
+  getRoomAvailabilityWindow,
   getBookingById,
   listAllBookings,
   listMyBookings,
@@ -60,6 +61,35 @@ export async function patchBookingStatus(req: Request, res: Response, next: Next
   try {
     const data = await updateBookingStatus(String(req.params.id), req.body.status as BookingStatus);
     sendSuccess(res, data, 200, 'Booking status updated');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getRoomAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const roomId = String(req.query.roomId ?? '');
+    const startDateRaw = String(req.query.startDate ?? '');
+    const daysRaw = Number(req.query.days ?? 7);
+
+    if (!roomId) {
+      throw new AppError('roomId is required', 422);
+    }
+
+    const parsedStartDate = startDateRaw ? new Date(startDateRaw) : new Date();
+    if (Number.isNaN(parsedStartDate.getTime())) {
+      throw new AppError('startDate must be a valid date', 422);
+    }
+
+    const days = Number.isFinite(daysRaw) ? Math.min(Math.max(Math.floor(daysRaw), 1), 31) : 7;
+
+    const data = await getRoomAvailabilityWindow({
+      roomId,
+      startDate: parsedStartDate,
+      days,
+    });
+
+    sendSuccess(res, data, 200, 'Room availability fetched');
   } catch (error) {
     next(error);
   }
