@@ -1,14 +1,27 @@
-import { BookingStatus, PaymentStatus, Prisma, Role } from '@prisma/client';
+import { BookingStatus, Prisma, Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 
-const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [BookingStatus.AWAITING_PAYMENT, BookingStatus.CONFIRMED];
-const COMPLETED_BOOKING_STATUSES: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
+const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.PENDING,
+  BookingStatus.AWAITING_PAYMENT,
+  BookingStatus.CONFIRMED,
+];
+const INCLUDED_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.PENDING,
+  BookingStatus.AWAITING_PAYMENT,
+  BookingStatus.CONFIRMED,
+  BookingStatus.COMPLETED,
+];
+const REVENUE_BOOKING_STATUSES: BookingStatus[] = [BookingStatus.CONFIRMED];
 
 type DashboardScope = {
   bookingWhere: Prisma.BookingWhereInput;
   roomWhere: Prisma.RoomWhereInput;
   hotelWhere: Prisma.HotelWhereInput;
-  paymentWhere: Prisma.PaymentWhereInput;
+};
+type DashboardPeriodOptions = {
+  months?: number;
+  offset?: number;
 };
 
 function buildScope(userId: string, role: Role): DashboardScope {
@@ -17,7 +30,6 @@ function buildScope(userId: string, role: Role): DashboardScope {
       bookingWhere: { room: { hotel: { adminId: userId } } },
       roomWhere: { hotel: { adminId: userId } },
       hotelWhere: { adminId: userId },
-      paymentWhere: { booking: { room: { hotel: { adminId: userId } } } },
     };
   }
 
@@ -25,7 +37,6 @@ function buildScope(userId: string, role: Role): DashboardScope {
     bookingWhere: {},
     roomWhere: {},
     hotelWhere: {},
-    paymentWhere: {},
   };
 }
 
@@ -37,12 +48,17 @@ function endOfMonth(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 }
 
-export async function getDashboardOverview(userId: string, role: Role) {
+export async function getDashboardOverview(userId: string, role: Role, options?: DashboardPeriodOptions) {
   const scope = buildScope(userId, role);
   const now = new Date();
+  const requestedMonths = Math.trunc(options?.months ?? 6);
+  const requestedOffset = Math.trunc(options?.offset ?? 0);
+  const months = Math.min(Math.max(requestedMonths, 1), 24);
+  const offset = Math.max(requestedOffset, 0);
   const currentMonthStart = startOfMonth(now);
-  const nextMonthStart = endOfMonth(now);
-  const chartStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1, 0, 0, 0, 0));
+  const anchorMonthStart = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - offset, 1, 0, 0, 0, 0));
+  const nextMonthStart = endOfMonth(anchorMonthStart);
+  const chartStart = new Date(Date.UTC(anchorMonthStart.getUTCFullYear(), anchorMonthStart.getUTCMonth() - (months - 1), 1, 0, 0, 0, 0));
 
   const [
     totalBookings,
@@ -50,7 +66,7 @@ export async function getDashboardOverview(userId: string, role: Role) {
     totalHotels,
     totalGuestsAggregate,
     totalRevenueAggregate,
-    monthlyPayments,
+    monthlyRevenueBookings,
     monthlyGuestBookings,
     recentBookings,
     todayCheckIns,
@@ -67,29 +83,29 @@ export async function getDashboardOverview(userId: string, role: Role) {
     prisma.booking.aggregate({
       where: {
         ...scope.bookingWhere,
-        status: { in: COMPLETED_BOOKING_STATUSES },
+        status: { in: INCLUDED_BOOKING_STATUSES },
       },
       _sum: { guestCount: true },
     }),
-    prisma.payment.aggregate({
+    prisma.booking.aggregate({
       where: {
-        ...scope.paymentWhere,
-        status: PaymentStatus.SUCCEEDED,
+        ...scope.bookingWhere,
+        status: { in: REVENUE_BOOKING_STATUSES },
       },
-      _sum: { amount: true },
-    }),
-    prisma.payment.findMany({
-      where: {
-        ...scope.paymentWhere,
-        status: PaymentStatus.SUCCEEDED,
-        createdAt: { gte: chartStart },
-      },
-      select: { amount: true, createdAt: true },
+      _sum: { totalPrice: true },
     }),
     prisma.booking.findMany({
       where: {
         ...scope.bookingWhere,
-        status: { in: COMPLETED_BOOKING_STATUSES },
+        status: { in: REVENUE_BOOKING_STATUSES },
+        updatedAt: { gte: chartStart, lt: nextMonthStart },
+      },
+      select: { totalPrice: true, updatedAt: true },
+    }),
+    prisma.booking.findMany({
+      where: {
+        ...scope.bookingWhere,
+        status: { in: INCLUDED_BOOKING_STATUSES },
         createdAt: { gte: chartStart },
       },
       select: { guestCount: true, createdAt: true },
@@ -118,6 +134,7 @@ export async function getDashboardOverview(userId: string, role: Role) {
     prisma.booking.count({
       where: {
         ...scope.bookingWhere,
+        status: { in: INCLUDED_BOOKING_STATUSES },
         checkIn: {
           gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)),
           lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0)),
@@ -127,6 +144,7 @@ export async function getDashboardOverview(userId: string, role: Role) {
     prisma.booking.count({
       where: {
         ...scope.bookingWhere,
+        status: { in: INCLUDED_BOOKING_STATUSES },
         checkOut: {
           gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)),
           lt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0)),
@@ -142,18 +160,18 @@ export async function getDashboardOverview(userId: string, role: Role) {
   ]);
 
   const monthlyMap = new Map<string, { month: string; revenue: number; guests: number }>();
-  for (let i = 5; i >= 0; i -= 1) {
-    const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+  for (let i = months - 1; i >= 0; i -= 1) {
+    const monthDate = new Date(Date.UTC(anchorMonthStart.getUTCFullYear(), anchorMonthStart.getUTCMonth() - i, 1));
     const key = `${monthDate.getUTCFullYear()}-${String(monthDate.getUTCMonth() + 1).padStart(2, '0')}`;
     const month = monthDate.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
     monthlyMap.set(key, { month, revenue: 0, guests: 0 });
   }
 
-  monthlyPayments.forEach((payment) => {
-    const key = `${payment.createdAt.getUTCFullYear()}-${String(payment.createdAt.getUTCMonth() + 1).padStart(2, '0')}`;
+  monthlyRevenueBookings.forEach((booking) => {
+    const key = `${booking.updatedAt.getUTCFullYear()}-${String(booking.updatedAt.getUTCMonth() + 1).padStart(2, '0')}`;
     const item = monthlyMap.get(key);
     if (item) {
-      item.revenue += payment.amount;
+      item.revenue += booking.totalPrice;
     }
   });
 
@@ -186,7 +204,7 @@ export async function getDashboardOverview(userId: string, role: Role) {
     role,
     totals: {
       totalGuests: totalGuestsAggregate._sum.guestCount ?? 0,
-      totalRevenue: Number((totalRevenueAggregate._sum.amount ?? 0).toFixed(2)),
+      totalRevenue: Number((totalRevenueAggregate._sum.totalPrice ?? 0).toFixed(2)),
       totalBookings,
       totalRooms,
       totalHotels,
