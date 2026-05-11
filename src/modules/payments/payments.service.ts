@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
 import { notifyPaymentStatusChanged } from '../../shared/services/notification.service';
 import { AppError } from '../../shared/utils/app-error';
@@ -64,6 +64,10 @@ export async function createPaymentIntent(bookingId: string, userId: string) {
       data: { status: BookingStatus.AWAITING_PAYMENT },
     });
 
+    if (!replacementIntent.client_secret) {
+      throw new AppError('Unable to initialize payment session. Please try again.', 502);
+    }
+
     return {
       payment: updatedPayment,
       clientSecret: replacementIntent.client_secret,
@@ -77,14 +81,52 @@ export async function createPaymentIntent(bookingId: string, userId: string) {
     metadata: { bookingId: booking.id },
   });
 
-  const payment = await prisma.payment.create({
-    data: {
-      bookingId: booking.id,
-      stripePaymentId: paymentIntent.id,
-      amount: booking.totalPrice,
-      status: PaymentStatus.PENDING,
-    },
-  });
+  if (!paymentIntent.client_secret) {
+    throw new AppError('Unable to initialize payment session. Please try again.', 502);
+  }
+
+  let payment;
+  try {
+    payment = await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        stripePaymentId: paymentIntent.id,
+        amount: booking.totalPrice,
+        status: PaymentStatus.PENDING,
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+      throw error;
+    }
+
+    const existingPayment = await prisma.payment.findUnique({
+      where: { bookingId: booking.id },
+    });
+
+    if (!existingPayment) {
+      throw error;
+    }
+
+    if (existingPayment.status === PaymentStatus.SUCCEEDED) {
+      throw new AppError('Payment already completed for this booking', 409);
+    }
+
+    const existingIntent = await stripe.paymentIntents.retrieve(existingPayment.stripePaymentId);
+    if (!existingIntent.client_secret) {
+      throw new AppError('Unable to initialize payment session. Please try again.', 502);
+    }
+
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: BookingStatus.AWAITING_PAYMENT },
+    });
+
+    return {
+      payment: existingPayment,
+      clientSecret: existingIntent.client_secret,
+    };
+  }
 
   await prisma.booking.update({
     where: { id: booking.id },
