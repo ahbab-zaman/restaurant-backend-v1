@@ -38,4 +38,10 @@ export const config = {
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME as string,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY as string,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET as string,
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  mailFrom: process.env.MAIL_FROM,
 };

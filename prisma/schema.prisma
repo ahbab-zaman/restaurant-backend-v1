@@ -20,6 +20,7 @@ model User {
   hotels        Hotel[]
   reviews       Review[]
   sessions      Session[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -107,6 +108,7 @@ model Booking {
   room       Room          @relation(fields: [roomId], references: [id])
   user       User          @relation(fields: [userId], references: [id])
   payment    Payment?
+  notifications Notification[]
 
   @@map("bookings")
 }
@@ -122,6 +124,24 @@ model Payment {
   booking         Booking       @relation(fields: [bookingId], references: [id])
 
   @@map("payments")
+}
+
+model Notification {
+  id        String             @id @default(cuid())
+  bookingId String
+  userId    String
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  subject   String
+  message   String
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  booking   Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 model Review {
@@ -168,4 +188,15 @@ enum RoomType {
   SUITE
   DELUXE
   FAMILY
+}
+
+enum NotificationType {
+  BOOKING_CREATED
+  PAYMENT_STATUS_CHANGED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
 }

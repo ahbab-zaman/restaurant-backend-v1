@@ -1,9 +1,10 @@
 import { BookingStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
+import { notifyPaymentStatusChanged } from '../../shared/services/notification.service';
 import { AppError } from '../../shared/utils/app-error';
 import { stripe } from './stripe.client';
 
-export async function createPaymentIntent(bookingId: string) {
+export async function createPaymentIntent(bookingId: string, userId: string) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: { payment: true },
@@ -13,8 +14,60 @@ export async function createPaymentIntent(bookingId: string) {
     throw new AppError('Booking not found', 404);
   }
 
+  if (booking.userId !== userId) {
+    throw new AppError('Forbidden', 403);
+  }
+
   if (booking.payment) {
-    throw new AppError('Payment already exists for this booking', 409);
+    if (booking.payment.status === PaymentStatus.SUCCEEDED) {
+      throw new AppError('Payment already completed for this booking', 409);
+    }
+
+    try {
+      const existingIntent = await stripe.paymentIntents.retrieve(booking.payment.stripePaymentId);
+
+      if (existingIntent.client_secret) {
+        if (booking.status !== BookingStatus.AWAITING_PAYMENT) {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { status: BookingStatus.AWAITING_PAYMENT },
+          });
+        }
+
+        return {
+          payment: booking.payment,
+          clientSecret: existingIntent.client_secret,
+        };
+      }
+    } catch {
+      // Fall through to create a fresh intent and relink the payment record.
+    }
+
+    const replacementIntent = await stripe.paymentIntents.create({
+      amount: Math.round(booking.totalPrice * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: { bookingId: booking.id },
+    });
+
+    const updatedPayment = await prisma.payment.update({
+      where: { bookingId: booking.id },
+      data: {
+        stripePaymentId: replacementIntent.id,
+        amount: booking.totalPrice,
+        status: PaymentStatus.PENDING,
+      },
+    });
+
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: BookingStatus.AWAITING_PAYMENT },
+    });
+
+    return {
+      payment: updatedPayment,
+      clientSecret: replacementIntent.client_secret,
+    };
   }
 
   const paymentIntent = await stripe.paymentIntents.create({
@@ -59,9 +112,18 @@ export async function processWebhook(body: Buffer, signature: string | undefined
       data: { status: PaymentStatus.SUCCEEDED },
     });
 
-    await prisma.booking.update({
+    const booking = await prisma.booking.update({
       where: { id: payment.bookingId },
       data: { status: BookingStatus.CONFIRMED },
+      include: { user: true },
+    });
+
+    await notifyPaymentStatusChanged({
+      bookingId: booking.id,
+      userId: booking.userId,
+      userEmail: booking.user.email,
+      userName: booking.user.name,
+      paymentStatus: PaymentStatus.SUCCEEDED,
     });
   }
 
@@ -73,11 +135,50 @@ export async function processWebhook(body: Buffer, signature: string | undefined
       data: { status: PaymentStatus.FAILED },
     });
 
-    await prisma.booking.update({
+    const booking = await prisma.booking.update({
       where: { id: payment.bookingId },
       data: { status: BookingStatus.REJECTED },
+      include: { user: true },
+    });
+
+    await notifyPaymentStatusChanged({
+      bookingId: booking.id,
+      userId: booking.userId,
+      userEmail: booking.user.email,
+      userName: booking.user.name,
+      paymentStatus: PaymentStatus.FAILED,
     });
   }
 
   return { received: true };
+}
+
+export async function updatePaymentStatusByAdmin(bookingId: string, status: PaymentStatus) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { payment: true, user: true },
+  });
+
+  if (!booking) {
+    throw new AppError('Booking not found', 404);
+  }
+
+  if (!booking.payment) {
+    throw new AppError('Payment not found for booking', 404);
+  }
+
+  const payment = await prisma.payment.update({
+    where: { bookingId: booking.id },
+    data: { status },
+  });
+
+  await notifyPaymentStatusChanged({
+    bookingId: booking.id,
+    userId: booking.userId,
+    userEmail: booking.user.email,
+    userName: booking.user.name,
+    paymentStatus: status,
+  });
+
+  return payment;
 }

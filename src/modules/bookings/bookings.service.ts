@@ -1,5 +1,6 @@
 import { BookingStatus, Prisma, Role } from '@prisma/client';
 import { prisma } from '../../shared/prisma/client';
+import { notifyBookingCreated } from '../../shared/services/notification.service';
 import { AppError } from '../../shared/utils/app-error';
 import { buildPaginationMeta, parsePagination } from '../../shared/utils/pagination';
 
@@ -56,7 +57,7 @@ export async function createBooking(userId: string, payload: CreateBookingInput)
   const nights = Math.ceil((payload.checkOut.getTime() - payload.checkIn.getTime()) / (1000 * 60 * 60 * 24));
   const totalPrice = nights * room.price;
 
-  return prisma.booking.create({
+  const booking = await prisma.booking.create({
     data: {
       userId,
       roomId: payload.roomId,
@@ -65,10 +66,25 @@ export async function createBooking(userId: string, payload: CreateBookingInput)
       guestCount: payload.guestCount,
       notes: payload.notes,
       totalPrice,
-      status: BookingStatus.AWAITING_PAYMENT,
+      // Keep newly created bookings non-blocking until payment intent is initialized.
+      status: BookingStatus.PENDING,
     },
-    include: { room: true },
+    include: { room: { include: { hotel: true } }, user: true },
   });
+
+  await notifyBookingCreated({
+    bookingId: booking.id,
+    userId: booking.userId,
+    userEmail: booking.user.email,
+    userName: booking.user.name,
+    hotelName: booking.room.hotel.name,
+    roomNumber: booking.room.roomNumber,
+    checkIn: booking.checkIn,
+    checkOut: booking.checkOut,
+    totalPrice: booking.totalPrice,
+  });
+
+  return booking;
 }
 
 export async function listMyBookings(userId: string, query: Record<string, unknown>) {
@@ -169,7 +185,7 @@ export async function getRoomAvailabilityWindow(payload: AvailabilityInput) {
   const overlapping = await prisma.booking.findMany({
     where: {
       roomId: payload.roomId,
-      status: { in: [BookingStatus.PENDING, BookingStatus.AWAITING_PAYMENT, BookingStatus.CONFIRMED] },
+      status: { in: [BookingStatus.AWAITING_PAYMENT, BookingStatus.CONFIRMED] },
       checkIn: { lt: end },
       checkOut: { gt: start },
     },
