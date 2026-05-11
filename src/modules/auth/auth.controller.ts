@@ -138,7 +138,7 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
     }
 
     await authService.deleteUser(userId);
-    sendSuccess(res, null, 204, 'User deleted successfully');
+    sendSuccess(res, null, 200, 'User deleted successfully');
   } catch (error) {
     next(error);
   }

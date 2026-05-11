@@ -1,11 +1,16 @@
-import { Request } from 'express';
-import { fromNodeHeaders } from 'better-auth/node';
-import { Role } from '@prisma/client';
-import { prisma } from '../../shared/prisma/client';
-import { auth } from './better-auth.instance';
-import { AppError } from '../../shared/utils/app-error';
-import { LoginInput, RegisterInput, UpdateUserInput, AdminUpdateUserInput } from './auth.schema';
-import { createAccessToken } from '../../shared/utils/access-token';
+import { Request } from "express";
+import { fromNodeHeaders } from "better-auth/node";
+import { Role } from "@prisma/client";
+import { prisma } from "../../shared/prisma/client";
+import { auth } from "./better-auth.instance";
+import { AppError } from "../../shared/utils/app-error";
+import {
+  LoginInput,
+  RegisterInput,
+  UpdateUserInput,
+  AdminUpdateUserInput,
+} from "./auth.schema";
+import { createAccessToken } from "../../shared/utils/access-token";
 
 type BetterAuthUserPayload = {
   id?: string;
@@ -32,9 +37,9 @@ type AuthResponse = {
   setCookie: string | null;
 };
 
-const parseAuthPayload = async (
-  response: { json: () => Promise<unknown> },
-): Promise<BetterAuthPayload> => {
+const parseAuthPayload = async (response: {
+  json: () => Promise<unknown>;
+}): Promise<BetterAuthPayload> => {
   try {
     return (await response.json()) as BetterAuthPayload;
   } catch {
@@ -43,11 +48,14 @@ const parseAuthPayload = async (
 };
 
 const resolveAuthErrorMessage = (payload: BetterAuthPayload): string | null => {
-  if (typeof payload.message === 'string' && payload.message.trim().length > 0) {
+  if (
+    typeof payload.message === "string" &&
+    payload.message.trim().length > 0
+  ) {
     return payload.message;
   }
 
-  if (typeof payload.error === 'string' && payload.error.trim().length > 0) {
+  if (typeof payload.error === "string" && payload.error.trim().length > 0) {
     return payload.error;
   }
 
@@ -72,12 +80,16 @@ export const registerUser = async (
 
     if (authResponse.status === 409) {
       throw new AppError(
-        message ?? 'An account with this email already exists. Please log in or use a different email.',
+        message ??
+          "An account with this email already exists. Please log in or use a different email.",
         409,
       );
     }
 
-    throw new AppError(message ?? `Registration failed (status ${authResponse.status}).`, authResponse.status);
+    throw new AppError(
+      message ?? `Registration failed (status ${authResponse.status}).`,
+      authResponse.status,
+    );
   }
 
   const payload = await parseAuthPayload(authResponse);
@@ -93,7 +105,7 @@ export const registerUser = async (
     },
   });
 
-  const setCookie = authResponse.headers.get('set-cookie');
+  const setCookie = authResponse.headers.get("set-cookie");
 
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
@@ -113,7 +125,10 @@ export const registerUser = async (
       };
     }
 
-    throw new AppError('Registration succeeded but user lookup failed. Please try logging in.', 500);
+    throw new AppError(
+      "Registration succeeded but user lookup failed. Please try logging in.",
+      500,
+    );
   }
 
   return {
@@ -132,9 +147,7 @@ export const registerUser = async (
   };
 };
 
-export const loginUser = async (
-  data: LoginInput,
-): Promise<AuthResponse> => {
+export const loginUser = async (data: LoginInput): Promise<AuthResponse> => {
   const authResponse = await auth.api.signInEmail({
     body: { email: data.email, password: data.password },
     asResponse: true,
@@ -143,7 +156,7 @@ export const loginUser = async (
   if (!authResponse.ok) {
     const payload = await parseAuthPayload(authResponse);
     const message = resolveAuthErrorMessage(payload);
-    throw new AppError(message ?? 'Invalid email or password', 401);
+    throw new AppError(message ?? "Invalid email or password", 401);
   }
 
   const payload = await parseAuthPayload(authResponse);
@@ -159,14 +172,14 @@ export const loginUser = async (
     },
   });
 
-  const setCookie = authResponse.headers.get('set-cookie');
+  const setCookie = authResponse.headers.get("set-cookie");
 
   if (!user) {
     if (payload.user?.id && payload.user?.email) {
       return {
         user: {
           id: payload.user.id,
-          name: payload.user.name ?? '',
+          name: payload.user.name ?? "",
           email: payload.user.email,
           role: Role.GUEST,
         },
@@ -179,7 +192,10 @@ export const loginUser = async (
       };
     }
 
-    throw new AppError('Login succeeded but user lookup failed. Please try again.', 500);
+    throw new AppError(
+      "Login succeeded but user lookup failed. Please try again.",
+      500,
+    );
   }
 
   return {
@@ -218,23 +234,25 @@ export const getCurrentUser = async (userId: string) => {
   });
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError("User not found", 404);
   }
 
   return user;
 };
 
-export const refreshAccessToken = async (req: Request): Promise<{ accessToken: string }> => {
+export const refreshAccessToken = async (
+  req: Request,
+): Promise<{ accessToken: string }> => {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
 
   if (!session?.user || !session.session) {
-    throw new AppError('Refresh session not found. Please log in again.', 401);
+    throw new AppError("Refresh session not found. Please log in again.", 401);
   }
 
   if (session.session.expiresAt < new Date()) {
-    throw new AppError('Refresh session expired. Please log in again.', 401);
+    throw new AppError("Refresh session expired. Please log in again.", 401);
   }
 
   const dbUser = await prisma.user.findUnique({
@@ -243,7 +261,7 @@ export const refreshAccessToken = async (req: Request): Promise<{ accessToken: s
   });
 
   if (!dbUser) {
-    throw new AppError('User not found for refresh. Please log in again.', 401);
+    throw new AppError("User not found for refresh. Please log in again.", 401);
   }
 
   return {
@@ -255,7 +273,10 @@ export const refreshAccessToken = async (req: Request): Promise<{ accessToken: s
   };
 };
 
-export const updateCurrentUser = async (userId: string, data: UpdateUserInput) => {
+export const updateCurrentUser = async (
+  userId: string,
+  data: UpdateUserInput,
+) => {
   const user = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -283,7 +304,7 @@ export const listAllUsers = async (page = 1, limit = 10) => {
       where: { role: { not: Role.SUPER_ADMIN } },
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         name: true,
@@ -321,17 +342,20 @@ export const getUserById = async (userId: string) => {
   });
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError("User not found", 404);
   }
 
   return user;
 };
 
-export const adminUpdateUser = async (userId: string, data: AdminUpdateUserInput) => {
+export const adminUpdateUser = async (
+  userId: string,
+  data: AdminUpdateUserInput,
+) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError("User not found", 404);
   }
 
   const updated = await prisma.user.update({
@@ -358,8 +382,67 @@ export const deleteUser = async (userId: string) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError("User not found", 404);
   }
 
-  await prisma.user.delete({ where: { id: userId } });
+  await prisma.$transaction(async (tx) => {
+    // 1. Find all bookings for this user
+    const userBookings = await tx.booking.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const bookingIds = userBookings.map((b) => b.id);
+
+    // 2. Delete payments tied to those bookings
+    if (bookingIds.length > 0) {
+      await tx.payment.deleteMany({ where: { bookingId: { in: bookingIds } } });
+    }
+
+    // 3. Delete bookings (notifications cascade from bookings already)
+    await tx.booking.deleteMany({ where: { userId } });
+
+    // 4. Find all hotels owned by this user, delete their rooms' reviews & bookings first
+    const userHotels = await tx.hotel.findMany({
+      where: { adminId: userId },
+      select: { id: true },
+    });
+    const hotelIds = userHotels.map((h) => h.id);
+
+    if (hotelIds.length > 0) {
+      const hotelRooms = await tx.room.findMany({
+        where: { hotelId: { in: hotelIds } },
+        select: { id: true },
+      });
+      const roomIds = hotelRooms.map((r) => r.id);
+
+      if (roomIds.length > 0) {
+        // Delete payments for bookings on these rooms
+        const roomBookings = await tx.booking.findMany({
+          where: { roomId: { in: roomIds } },
+          select: { id: true },
+        });
+        const roomBookingIds = roomBookings.map((b) => b.id);
+
+        if (roomBookingIds.length > 0) {
+          await tx.payment.deleteMany({
+            where: { bookingId: { in: roomBookingIds } },
+          });
+          await tx.booking.deleteMany({
+            where: { id: { in: roomBookingIds } },
+          });
+        }
+
+        await tx.review.deleteMany({ where: { roomId: { in: roomIds } } });
+      }
+
+      // Rooms cascade-delete from Hotel, so just delete hotels
+      await tx.hotel.deleteMany({ where: { adminId: userId } });
+    }
+
+    // 5. Delete reviews left by this user on other rooms
+    await tx.review.deleteMany({ where: { userId } });
+
+    // 6. Finally delete the user (sessions, accounts, notifications cascade)
+    await tx.user.delete({ where: { id: userId } });
+  });
 };
